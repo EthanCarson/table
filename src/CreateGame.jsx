@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { supabase } from "./lib/supabase"
 
-function CreateGame({startGame}) {
+function CreateGame({startGame, playerID}) {
     const [error, setError] = useState("");
     const [profiles, setProfiles] = useState([]);
 
@@ -28,11 +28,11 @@ function CreateGame({startGame}) {
         const playerIDs = Array.from(
             e.target.querySelectorAll('input[name="players"]:checked')
         ).map(el => el.value);
-
+        const creator = playerID
          // 1. insert the game
              const { data: game, error: gameError } = await supabase
         .from("games")
-        .insert({ name, description })
+        .insert({ name, description, creator })
         .select()
         .single();
 
@@ -55,7 +55,7 @@ function CreateGame({startGame}) {
                 setError(playersError.message);
             }
 
-            StartGame(game.id);
+            startGame(game.id);
     }
     return (
         <>
