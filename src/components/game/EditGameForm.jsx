@@ -1,19 +1,39 @@
 // EditGameForm.jsx
-// Creator-only screen for renaming a game or deleting it. The delete
-// confirmation is local state here, so Game doesn't need an isDeleting
-// flag of its own.
+// Creator-only screen for renaming a game, changing its roster, or
+// deleting it. The delete confirmation is local state here, so Game
+// doesn't need an isDeleting flag of its own.
+//
+// gamePlayers (current roster) and allPlayers (every profile, for the
+// checkbox list) both come in as props from Game.jsx.
 
 import { useState } from "react";
 
-function EditGameForm({ game, onSave, onDelete, onCancel }) {
+function EditGameForm({
+  game,
+  onSave,
+  onDelete,
+  onCancel,
+  gamePlayers,
+  allPlayers,
+}) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+
+  const currentIDs = gamePlayers.map((p) => p.id);
 
   function handleSubmit(e) {
     e.preventDefault();
     // Read through .elements: form.name is the form's own name attribute,
     // so e.target.name.value would be undefined here.
     const { name, description } = e.target.elements;
-    onSave(name.value, description.value);
+
+    const selectedPlayerIDs = Array.from(
+      e.target.querySelectorAll('input[name="players"]:checked')
+    ).map((el) => el.value);
+
+    // Two separate arguments on purpose: games and game_players are
+    // different tables, so the game edit and the roster edit are two
+    // different writes even though they're saved from one form.
+    onSave({ name: name.value, description: description.value }, selectedPlayerIDs);
   }
 
   if (confirmingDelete) {
@@ -43,6 +63,19 @@ function EditGameForm({ game, onSave, onDelete, onCancel }) {
           name="description"
           defaultValue={game.description}
         />
+
+        <p>Players</p>
+        {allPlayers.map((player) => (
+          <label key={player.id}>
+            <input
+              type="checkbox"
+              name="players"
+              value={player.id}
+              defaultChecked={currentIDs.includes(player.id)}
+            />
+            {player.name}
+          </label>
+        ))}
 
         <button type="submit">Save changes</button>
         <button type="button" onClick={onCancel}>

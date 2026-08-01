@@ -21,6 +21,7 @@ function Game({ gameID, playerID, onExit }) {
   const [gameData, setGameData] = useState(null);
   const [creatorName, setCreatorName] = useState("");
   const [editing, setEditing] = useState(false);
+  const [allPlayers, setAllPlayers] = useState([]);
 
   // The oldest unread message for this player in this game, or null.
   // Shape: { id, content, senderName }
@@ -59,6 +60,16 @@ function Game({ gameID, playerID, onExit }) {
 
     if (error) setError(error.message);
     else setPlayers(data);
+  }
+
+  // Only called when the edit screen actually opens — most visits to a
+  // game never need the full profile list, so there's no reason to fetch
+  // it on every load.
+  async function loadAllPlayers() {
+    const { data, error } = await api.fetchProfiles();
+
+    if (error) setError(error.message);
+    else setAllPlayers(data);
   }
 
   async function loadGame() {
@@ -107,15 +118,33 @@ function Game({ gameID, playerID, onExit }) {
     }
   }
 
-  async function handleSaveGame(name, description) {
-    const { error } = await api.updateGame(gameID, { name, description });
+  // EditGameForm calls onSave({name, description}, selectedPlayerIDs) —
+  // two separate arguments, since games and game_players are separate
+  // writes even though they're saved from one form.
+  async function handleSaveGame({ name, description }, selectedPlayerIDs) {
+    const { error: gameError } = await api.updateGame(gameID, {
+      name,
+      description,
+    });
 
-    if (error) {
-      setError(error.message);
-    } else {
-      setGameData({ ...gameData, name, description });
-      setEditing(false);
+    if (gameError) {
+      setError(gameError.message);
+      return;
     }
+
+    const { error: playersError } = await api.updateGamePlayers({
+      gameID,
+      playerIDs: selectedPlayerIDs,
+    });
+
+    if (playersError) {
+      setError(playersError.message);
+      return;
+    }
+
+    setGameData({ ...gameData, name, description });
+    loadPlayers(); // roster changed, so refresh what PlayerList shows
+    setEditing(false);
   }
 
   async function handleDeleteGame() {
@@ -156,6 +185,8 @@ function Game({ gameID, playerID, onExit }) {
         onSave={handleSaveGame}
         onDelete={handleDeleteGame}
         onCancel={() => setEditing(false)}
+        gamePlayers={players}
+        allPlayers={allPlayers}
       />
     );
   }
@@ -183,7 +214,13 @@ function Game({ gameID, playerID, onExit }) {
       />
 
       {gameData && gameData.creator === playerID && (
-        <button type="button" onClick={() => setEditing(true)}>
+        <button
+          type="button"
+          onClick={() => {
+            loadAllPlayers();
+            setEditing(true);
+          }}
+        >
           Edit game
         </button>
       )}

@@ -40,7 +40,16 @@ export async function createGame({ name, description, creator }) {
 }
 
 export async function updateGame(gameID, { name, description }) {
-  return supabase.from("games").update({ name, description }).eq("id", gameID);
+  // .select().single() forces the update to report what actually
+  // changed. Without it, an RLS policy that matches zero rows still
+  // returns {error: null} — indistinguishable from success — and the
+  // caller ends up updating local state for a write that never happened.
+  return supabase
+    .from("games")
+    .update({ name, description })
+    .eq("id", gameID)
+    .select()
+    .single();
 }
 
 export async function deleteGame(gameID) {
@@ -77,6 +86,37 @@ export async function fetchGamePlayers(gameID) {
 export async function addPlayersToGame(gameID, playerIDs) {
   const rows = playerIDs.map((player_id) => ({ game_id: gameID, player_id }));
   return supabase.from("game_players").insert(rows);
+}
+
+export async function deleteGamePlayers(gameID) {
+  return supabase.from("game_players").delete().eq("game_id", gameID).select();
+}
+
+// Full-replace strategy: wipe the roster and reinsert the new one. Awaits
+// the delete before inserting, so the two steps can't race, and verifies
+// the delete actually matched rows — an RLS policy that silently filters
+// everything out looks identical to "nothing to delete" otherwise, and
+// the insert below would then duplicate the existing roster instead of
+// replacing it.
+export async function updateGamePlayers({ gameID, playerIDs }) {
+  const { data: deletedRows, error: deleteError } = await deleteGamePlayers(gameID);
+  if (deleteError) return { error: deleteError };
+
+  const { data: previousPlayers } = await fetchGamePlayers(gameID);
+  if (previousPlayers.length > 0 && deletedRows.length === 0) {
+    return {
+      error: {
+        message:
+          "Roster update blocked: existing players weren't deleted (likely an RLS policy mismatch). Aborting to avoid duplicate rows.",
+      },
+    };
+  }
+
+  if (playerIDs.length === 0) return { error: null };
+
+  // One batch insert instead of one round trip per player.
+  const { error: insertError } = await addPlayersToGame(gameID, playerIDs);
+  return { error: insertError };
 }
 
 // Returns { data: true | false } rather than a row — callers only care
