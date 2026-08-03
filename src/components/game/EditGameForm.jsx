@@ -15,6 +15,7 @@ function EditGameForm({
   onCancel,
   gamePlayers,
   allPlayers,
+  currentPlayer,
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -27,13 +28,16 @@ function EditGameForm({
     const { name, description } = e.target.elements;
 
     const selectedPlayerIDs = Array.from(
-      e.target.querySelectorAll('input[name="players"]:checked')
+      e.target.querySelectorAll('input[name="players"]:checked'),
     ).map((el) => el.value);
 
     // Two separate arguments on purpose: games and game_players are
     // different tables, so the game edit and the roster edit are two
     // different writes even though they're saved from one form.
-    onSave({ name: name.value, description: description.value }, selectedPlayerIDs);
+    onSave(
+      { name: name.value, description: description.value },
+      selectedPlayerIDs,
+    );
   }
 
   if (confirmingDelete) {
@@ -65,17 +69,19 @@ function EditGameForm({
         />
 
         <p>Players</p>
-        {allPlayers.map((player) => (
-          <label key={player.id}>
-            <input
-              type="checkbox"
-              name="players"
-              value={player.id}
-              defaultChecked={currentIDs.includes(player.id)}
-            />
-            {player.name}
-          </label>
-        ))}
+        {allPlayers
+          .filter((player) => player.id !== currentPlayer)
+          .map((player) => (
+            <label key={player.id}>
+              <input
+                type="checkbox"
+                name="players"
+                value={player.id}
+                defaultChecked={currentIDs.includes(player.id)}
+              />
+              {player.name}
+            </label>
+          ))}
 
         <button type="submit">Save changes</button>
         <button type="button" onClick={onCancel}>

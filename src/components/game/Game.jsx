@@ -31,16 +31,7 @@ function Game({ gameID, playerID, onExit }) {
   // which replaces the old separate prepareMessage flag.
   const [recipients, setRecipients] = useState(null);
 
-  useEffect(() => {
-    loadMembership();
-    loadPlayers();
-    loadGame();
-    loadNextMessage();
-
-    // Returns its own cleanup, so the subscription is torn down when
-    // gameID/playerID change or the component unmounts.
-    return api.subscribeToMessages(playerID, loadNextMessage);
-  }, [gameID, playerID]);
+  const [kicked, setKicked] = useState(false);
 
   // Look up the creator's name once the game row arrives, but only if
   // you aren't the creator (no need to look up your own name).
@@ -49,10 +40,14 @@ function Game({ gameID, playerID, onExit }) {
   }, [gameData, playerID]);
 
   async function loadMembership() {
-    const { data: isMember, error } = await api.isPlayerInGame(gameID, playerID);
+    const { data: isMember, error } = await api.isPlayerInGame(
+      gameID,
+      playerID,
+    );
 
     if (error) setAuthenticationError(error.message);
-    else if (!isMember) setAuthenticationError("You are not a player in this game.");
+    else if (!isMember)
+      setAuthenticationError("You are not a player in this game.");
   }
 
   async function loadPlayers() {
@@ -154,6 +149,22 @@ function Game({ gameID, playerID, onExit }) {
     else onExit(); // hand control back to App so the list refreshes
   }
 
+  function handleKicked() {
+    setKicked(true);
+    setRecipients(null); // bail out of any in-progress compose/view screens
+  }
+
+  if (kicked) {
+    return (
+      <div>
+        <p>You've been removed from this game.</p>
+        <button type="button" onClick={onExit}>
+          Back to games
+        </button>
+      </div>
+    );
+  }
+
   if (authenticationError) {
     return <div>Error: {authenticationError}</div>;
   }
@@ -187,6 +198,7 @@ function Game({ gameID, playerID, onExit }) {
         onCancel={() => setEditing(false)}
         gamePlayers={players}
         allPlayers={allPlayers}
+        currentPlayer={playerID}
       />
     );
   }

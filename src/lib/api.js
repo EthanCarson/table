@@ -210,3 +210,24 @@ export function subscribeToGameInvites(playerID, onInvite) {
 
   return () => supabase.removeChannel(channel);
 }
+
+export function subscribeToMembership(gameID, playerID, onKicked) {
+  const channel = supabase
+    .channel(`membership-${gameID}-${playerID}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "DELETE",
+        schema: "public",
+        table: "game_players",
+        filter: `game_id=eq.${gameID}`,
+      },
+      (payload) => {
+        // payload.old holds the deleted row
+        if (payload.old.player_id === playerID) onKicked();
+      }
+    )
+    .subscribe();
+
+  return () => supabase.removeChannel(channel);
+}
